@@ -1,0 +1,11 @@
+Olen hyvä:
+1.Luonnollinen
+2.Rento
+3.Suoria/lähes suoria vastauksia
+
+Olen huono:
+1.Suunnitelmallisuus
+2.Artikulointi
+3.Järjestelmällisyys
+
+ANSVA

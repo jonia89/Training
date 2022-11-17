@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+# aws cloudformation update-stack --stack-name andy-cf --template-body file://code/exercises/100c.yaml --capabilities CAPABILITY_IAM
+# https://dev.to/lubanasachin/cloudformation-lambda-with-http-api-gateway-3a66
+# https://github.com/aribeth007/simple-books-api/blob/main/part2/cloudformation.yaml
+
+Description: |
+  Ex 100
+
+Resources:
+
+  lambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: LambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - 'arn:aws:logs:*:*:*'
+                Effect: Allow
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+
+  getFruitLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: 'getFruit'
+      Role: !GetAtt lambdaRole.Arn
+      Handler: index.handler
+      Runtime: nodejs16.x
+      MemorySize: 128
+      Code:
+        ZipFile: |
+          exports.handler = async (event) => {
+            const response = {
+              body: JSON.stringify([
+                { id: 1, name: 'banana', price: 1 },
+                { id: 2, name: 'pineapple', price: 2 },
+              ]),
+              statusCode: 200
+            }
+            return response
+          }
+
+  lambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref getFruitLambda
+      Action: "lambda:InvokeFunction"
+      Principal: apigateway.amazonaws.com
+
+  fruitIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref apiGateway
+      Description: Lambda proxy integration
+      IntegrationType: AWS_PROXY
+      IntegrationMethod: POST
+      PayloadFormatVersion: "2.0"
+      IntegrationUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${getFruitLambda.Arn}/invocations'
+
+  apiGateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: "ex-100"
+      ProtocolType: "HTTP"
+
+  apiGatewayStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      AutoDeploy: true
+      DeploymentId: !Ref apiGatewayDeployment
+      StageName: '$default'
+      ApiId: !Ref apiGateway
+  
+  apiGatewayDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    Properties:
+      ApiId: !Ref apiGateway
+
+  apiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref apiGateway
+      RouteKey: "GET /"
+      AuthorizationType: NONE
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref fruitIntegration

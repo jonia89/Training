@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  EC2 Hello world!
+Mappings:
+  RegionMap:
+    eu-west-1:
+      HVM64: "ami-0ea0f26a6d50850c5"
+    eu-north-1:
+      HVM64: "ami-0bcf2639b551f6b31"
+
+Outputs:
+  Environment:
+    Condition: prodEnv
+    Value: !Ref joniEC2Instance
+  TestOutput:
+    Description: Return the name of the AMI ID that matches the region and environment type keys
+    Value: !FindInMap [RegionMap, !Ref "AWS::Region", !Ref EnvType]
+  PublicIp:
+    Condition: prodEnv
+    Description: IP address of EC2 instance
+    Value: !GetAtt joniEC2Instance.PublicIp
+Parameters:
+  EnvType:
+    Description: Environment type.
+    Default: test
+    Type: String
+    AllowedValues: [prod, test]
+    ConstraintDescription: must specify prod or test.
+
+Conditions:
+  prodEnv: !Equals [!Ref EnvType, prod]
+Resources:
+  joniallow8888:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow access to port 8888
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: "8888"
+          ToPort: "8888"
+          CidrIp: "0.0.0.0/0"
+
+  joniEC2Instance:
+    Type: AWS::EC2::Instance
+    Condition: prodEnv
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", HVM64]
+      InstanceType: t3.micro
+      SecurityGroupIds:
+        - !Ref joniallow8888
+      UserData: !Base64 |
+        #!/bin/bash
+
+        cat <<EOT >> /usr/bin/server.py
+        import http.server; import socketserver; from http import HTTPStatus;
+        class Handler(http.server.SimpleHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(HTTPStatus.OK)
+                self.end_headers()
+                self.wfile.write(b'Hello world')
+        httpd = socketserver.TCPServer(('', 8888), Handler); httpd.serve_forever();
+        EOT
+
+        cat <<EOT >> /etc/systemd/system/test.service
+        [Unit]
+        Description=example systemd service unit file.
+
+        [Service]
+        ExecStart=/usr/bin/python3 /usr/bin/server.py
+
+        [Install]
+        WantedBy=multi-user.target
+        EOT
+
+        systemctl daemon-reload
+        systemctl enable test.service
+        systemctl start test.service

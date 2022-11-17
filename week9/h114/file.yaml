@@ -1,0 +1,24 @@
+apiVersion: apps/v1 
+kind: Deployment 
+metadata: 
+  creationTimestamp: null 
+  labels: 
+    app: throw-dice 
+  name: throw-dice 
+spec: 
+  replicas: 1 
+  selector: 
+    matchLabels: 
+      app: throw-dice 
+  strategy: {} 
+  template: 
+    metadata: 
+      creationTimestamp: null 
+      labels: 
+        app: throw-dice 
+    spec: 
+      containers: 
+      - image: throw-dice 
+        name: throw-dice 
+        imagePullPolicy: Never
+        resources: {}
